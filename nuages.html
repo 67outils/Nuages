@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Champ du Feu – Planning photo 7 jours</title>
+<style>
+:root{--bg:#f4f5f2;--c:#fff;--t:#1d2a24;--m:#6a766f;--b:#dde2dc;--a:#2f6f4f}
+@media(prefers-color-scheme:dark){:root{--bg:#141a17;--c:#1e2622;--t:#e8eee9;--m:#9aa8a0;--b:#2c3631;--a:#6fcf97}}
+*{box-sizing:border-box}body{margin:0;font:15px/1.5 system-ui,sans-serif;background:var(--bg);color:var(--t);padding:16px;max-width:1100px;margin:auto}
+h1{font-size:22px;margin:0 0 4px}h2{font-size:16px;margin:20px 0 8px}.m{color:var(--m);font-size:13px}
+.g{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:10px}
+.d{background:var(--c);border:2px solid var(--b);border-radius:12px;padding:10px;cursor:pointer}
+.d.on{border-color:var(--a)}.s{font-size:28px;font-weight:700}.bar{height:6px;border-radius:3px;background:var(--b);margin:4px 0 6px}.bar i{display:block;height:100%;border-radius:3px}
+.box{background:var(--c);border:1px solid var(--b);border-radius:12px;padding:12px;overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13px}td,th{padding:4px 8px;text-align:right;border-bottom:1px solid var(--b)}th:first-child,td:first-child{text-align:left}
+iframe{width:100%;height:420px;border:0;border-radius:12px}
+button,a.b{font:inherit;background:var(--c);color:var(--t);border:1px solid var(--b);border-radius:8px;padding:5px 10px;cursor:pointer;text-decoration:none;display:inline-block;margin:2px}
+button.on{border-color:var(--a);color:var(--a)}
+</style></head><body>
+<h1>🌲 Champ du Feu – Planning photo 7 jours</h1>
+<div class="m">Score calculé sur la fenêtre « lever du soleil −1 h → +3 h », à partir des données Open-Meteo (sommet 1 099 m vs vallée de Villé 270 m). Indicatif : les modèles prévoient mal la hauteur exacte des stratus.</div>
+<div id="st" class="m">Chargement…</div>
+<div class="g" id="days"></div>
+<h2 id="dt"></h2><div class="box"><div id="sc" class="m"></div><table id="tb"></table></div>
+<h2>Carte Windy</h2>
+<div id="ov"></div><iframe id="w" loading="lazy"></iframe>
+<h2>Vérifier sur place</h2>
+<a class="b" target="_blank" href="https://www.meteoblue.com/fr/meteo/webcams/champ-du-feu_france_7667432">📷 Webcams Champ du Feu</a>
+<a class="b" target="_blank" href="https://www.infoclimat.fr/observations-meteo/temps-reel/belmont-champ-du-feu/000MO.html">📡 Station Infoclimat (1 000 m)</a>
+<script>
+const S={la:48.387,lo:7.271,el:1099},V={la:48.34,lo:7.30,el:270};
+const H="temperature_2m,relative_humidity_2m,dew_point_2m,cloud_cover_low,cloud_cover_mid,cloud_cover_high,precipitation,wind_speed_10m,visibility";
+const url=p=>`https://api.open-meteo.com/v1/forecast?latitude=${p.la}&longitude=${p.lo}&elevation=${p.el}&hourly=${H}&daily=sunrise&timezone=Europe%2FParis&forecast_days=8`;
+const cl=(x,a=0,b=1)=>Math.max(a,Math.min(b,x)),av=a=>a.reduce((x,y)=>x+y,0)/(a.length||1);
+const trap=(x,a,b,c,d)=>x<=a||x>=d?0:x<b?(x-a)/(b-a):x<=c?1:(d-x)/(d-c);
+let R=[],sel=0,s,v;
+function idx(d,from,to){const sr=new Date(s.daily.sunrise[d]).getTime();return s.hourly.time.map((t,i)=>[new Date(t).getTime(),i]).filter(([t])=>t>=sr+from*36e5&&t<=sr+to*36e5).map(x=>x[1])}
+function day(d){const I=idx(d,-1,3);if(!I.length)return null;
+ const g=(o,k)=>av(I.map(i=>o.hourly[k][i]));
+ const sp=av(I.map(i=>s.hourly.temperature_2m[i]-s.hourly.dew_point_2m[i])),dT=g(s,"temperature_2m")-g(v,"temperature_2m"),
+ rh=g(v,"relative_humidity_2m"),low=g(s,"cloud_cover_low"),w=g(s,"wind_speed_10m"),p=g(s,"precipitation"),hm=g(s,"cloud_cover_high")+g(s,"cloud_cover_mid"),vis=g(s,"visibility");
+ const sc=25*trap(sp,-1,0,2.5,6)+15*cl((dT+6)/4)+10*cl((rh-80)/15)+15*cl((low-30)/50)+15*trap(w,0,5,25,45)+10*(1-cl(p/0.5))+10*(1-cl(hm/150));
+ let lab;if(p>.3||w>45)lab="🌧️ Mauvais (pluie/vent)";else if(sp<.7&&vis<500)lab="🌫️ Plein brouillard";else if(sp<=3&&w>=5)lab="🌲 Nuages dans les sapins";else if(rh>=90&&sp>3&&dT>-3)lab="☁️ Mer de nuages possible";else if(low<20)lab="☀️ Dégagé";else lab="⛅ Mitigé";
+ return{sc:Math.round(sc),lab,sp,dT,rh,low,w,p}}
+function col(x){return x>=70?"#2f9e5f":x>=45?"#e0a030":"#cc4b3f"}
+function show(d){sel=d;document.querySelectorAll(".d").forEach((e,i)=>e.classList.toggle("on",i==d));const r=R[d];
+ const dd=new Date(s.daily.sunrise[d]);document.getElementById("dt").textContent="Détail – "+dd.toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"})+" (lever "+s.daily.sunrise[d].slice(11)+")";
+ document.getElementById("sc").textContent=r?`Score ${r.sc}/100 – ${r.lab}`:"";
+ const I=idx(d,-2,5);let h="<tr><th>Heure</th><th>T sommet</th><th>T−Td</th><th>Δ T sommet−vallée</th><th>HR vallée</th><th>Nuages bas</th><th>Vent km/h</th><th>Pluie mm</th></tr>";
+ I.forEach(i=>{const t=s.hourly;h+=`<tr><td>${t.time[i].slice(11)}</td><td>${t.temperature_2m[i].toFixed(1)}°</td><td>${(t.temperature_2m[i]-t.dew_point_2m[i]).toFixed(1)}</td><td>${(t.temperature_2m[i]-v.hourly.temperature_2m[i]).toFixed(1)}</td><td>${v.hourly.relative_humidity_2m[i]}%</td><td>${t.cloud_cover_low[i]}%</td><td>${t.wind_speed_10m[i].toFixed(0)}</td><td>${t.precipitation[i]}</td></tr>`});
+ document.getElementById("tb").innerHTML=h}
+Promise.all([fetch(url(S)).then(r=>r.json()),fetch(url(V)).then(r=>r.json())]).then(([a,b])=>{s=a;v=b;
+ const el=document.getElementById("days");
+ s.daily.time.forEach((t,d)=>{const r=day(d);R.push(r);const dt=new Date(t),conf=d<2?"fiable":d<4?"moyenne":"indicative";
+  const e=document.createElement("div");e.className="d";e.onclick=()=>show(d);
+  e.innerHTML=`<b>${dt.toLocaleDateString("fr-FR",{weekday:"short",day:"numeric",month:"short"})}</b>`+(r?`<div class="s" style="color:${col(r.sc)}">${r.sc}</div><div class="bar"><i style="width:${r.sc}%;background:${col(r.sc)}"></i></div><div class="m">${r.lab}</div>`:'<div class="m">—</div>')+`<div class="m">Confiance : ${conf}</div>`;el.appendChild(e)});
+ const best=R.map((r,i)=>[r?r.sc:-1,i]).sort((x,y)=>y[0]-x[0])[0][1];
+ document.getElementById("st").textContent="Meilleure fenêtre : "+new Date(s.daily.time[best]).toLocaleDateString("fr-FR",{weekday:"long",day:"numeric",month:"long"})+" ("+R[best].sc+"/100). Mis à jour "+new Date().toLocaleTimeString("fr-FR");
+ show(best)}).catch(e=>document.getElementById("st").textContent="Erreur de chargement (connexion internet requise) : "+e);
+const OV=[["clouds","Nuages"],["rh","Humidité"],["wind","Vent"],["temp","Température"],["rain","Pluie"]];
+function win(o){document.getElementById("w").src=`https://embed.windy.com/embed2.html?lat=${S.la}&lon=${S.lo}&detailLat=${S.la}&detailLon=${S.lo}&zoom=9&level=surface&overlay=${o}&product=ecmwf&menu=&message=true&marker=true&calendar=now&type=map&location=coordinates&detail=true&metricWind=km%2Fh&metricTemp=%C2%B0C`;
+ document.querySelectorAll("#ov button").forEach(b=>b.classList.toggle("on",b.dataset.o==o))}
+document.getElementById("ov").innerHTML=OV.map(([k,n])=>`<button data-o="${k}" onclick="win('${k}')">${n}</button>`).join("");win("clouds");
+</script></body></html>
